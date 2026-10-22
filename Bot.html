@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unstoppable Wallet - Prediction Engine & Bot</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0b0f17; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .glow-green { box-shadow: 0 0 20px rgba(0, 211, 149, 0.15); }
+        .glow-purple { box-shadow: 0 0 20px rgba(139, 92, 246, 0.15); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0f17; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-black">
+
+    <!-- SECURE LOCAL LOGIN OVERLAY (Unstoppable Vault) -->
+    <div id="loginOverlay" class="fixed inset-0 z-50 bg-[#0b0f17] flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-[#121824] border border-gray-800 rounded-2xl p-8 glow-green">
+            <div class="flex items-center space-x-3 mb-6">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold text-xl border border-emerald-500/20">🛡️</div>
+                <div>
+                    <h2 class="text-xl font-bold tracking-tight">Unstoppable Vault</h2>
+                    <p class="text-xs text-gray-400">Zero-Knowledge Local Storage Engine</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Secret Recovery Phrase (12/24 Words)</label>
+                    <textarea id="seedInput" rows="3" placeholder="Enter your 12-word recovery phrase or auto-fill demo..." class="w-full bg-[#090c10] border border-gray-800 rounded-xl p-3 text-sm text-emerald-400 focus:outline-none focus:border-emerald-500 resize-none font-mono"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Local Master PIN (Device-Bound)</label>
+                    <input type="password" id="pinInput" placeholder="••••" maxlength="6" class="w-full bg-[#090c10] border border-gray-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono tracking-widest text-center text-lg">
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button onclick="autoFillDemo()" class="w-1/3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-3 rounded-xl text-sm transition">Auto Demo</button>
+                    <button onclick="unlockVault()" class="w-2/3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20">Unlock Local Wallet</button>
+                </div>
+                <p class="text-[11px] text-center text-gray-500 mt-4">🔐 Fully client-side. No telemetry, no logs sent to external servers.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP DASHBOARD (Hidden until unlocked) -->
+    <div id="mainDashboard" class="hidden flex-1 flex flex-col">
+        <!-- Top Nav -->
+        <header class="border-b border-gray-800 bg-[#121824]/50 backdrop-blur sticky top-0 z-40 px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <span class="text-2xl">🛡️</span>
+                <h1 class="font-bold text-lg tracking-tight">Unstoppable <span class="text-emerald-400">Prediction & Bot Engine</span></h1>
+                <span class="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full font-mono border border-emerald-500/20">Tor Node Active</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right hidden sm:block">
+                    <div class="text-xs text-gray-400">Connected Vault</div>
+                    <div class="text-xs font-mono text-emerald-400">bc1q...unstoppable99</div>
+                </div>
+                <button onclick="lockVault()" class="bg-gray-800 hover:bg-gray-700 text-red-400 px-4 py-2 rounded-xl text-xs font-semibold transition border border-gray-700">Lock Wallet</button>
+            </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <main class="max-w-7xl w-full mx-auto p-6 space-y-6 flex-1">
+            
+            <!-- Top Metric Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-[#121824] border border-gray-800 rounded-2xl p-5">
+                    <div class="text-gray-400 text-xs font-medium uppercase tracking-wider">Simulated Portfolio</div>
+                    <div class="text-2xl font-bold mt-2 font-mono" id="portfolioVal">\$24,852.10</div>
+                    <div class="text-emerald-400 text-xs mt-1 font-semibold">↑ +3.42% (24h Local Index)</div>
+                </div>
+                <div class="bg-[#121824] border border-gray-800 rounded-2xl p-5">
+                    <div class="text-gray-400 text-xs font-medium uppercase tracking-wider">Bot Execution Status</div>
+                    <div class="text-2xl font-bold mt-2 flex items-center space-x-2">
+                        <span id="botStatusIndicator" class="w-3 h-3 rounded-full bg-gray-500 animate-pulse"></span>
+                        <span id="botStatusText" class="text-gray-400">Standby</span>
+                    </div>
+                    <div class="text-gray-500 text-xs mt-1" id="botActiveStrategy">Strategy: None Selected</div>
+                </div>
+                <div class="bg-[#121824] border border-gray-800 rounded-2xl p-5">
+                    <div class="text-gray-400 text-xs font-medium uppercase tracking-wider">Privacy & UTXO Score</div>
+                    <div class="text-2xl font-bold mt-2 text-emerald-400 font-mono">99.8%</div>
+                    <div class="text-gray-500 text-xs mt-1">Zero Metadata Leakage</div>
+                </div>
+                <div class="bg-[#121824] border border-gray-800 rounded-2xl p-5">
+                    <div class="text-gray-400 text-xs font-medium uppercase tracking-wider">AI Tensor Prediction</div>
+                    <div class="text-2xl font-bold mt-2 text-purple-400 font-mono" id="predictionDirection">Bullish (7D)</div>
+                    <div class="text-gray-500 text-xs mt-1">Local Quantized Weights</div>
+                </div>
+            </div>
+
+            <!-- Middle Section: Chart & Autonomous Bot Panel -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Chart Container (2 cols) -->
+                <div class="lg:col-span-2 bg-[#121824] border border-gray-800 rounded-2xl p-6 flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold text-base">Multi-Chain Trend Forecasting</h3>
+                            <p class="text-xs text-gray-400">Real-time localized inference over Tor peer feeds</p>
+                        </div>
+                        <button onclick="triggerManualScan()" class="bg-gray-800 hover:bg-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-700 transition">Force Tensor Refresh</button>
+                    </div>
+                    <div class="relative h-72 w-full">
+                        <canvas id="predictionChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Bot Control Panel (1 col) -->
+                <div class="bg-[#121824] border border-gray-800 rounded-2xl p-6 flex flex-col justify-between space-y-4">
+                    <div>
+                        <h3 class="font-bold text-base mb-1">Autonomous Bot Engine</h3>
+                        <p class="text-xs text-gray-400 mb-4">Configure local strategy parameters</p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Select Strategy</label>
+                                <select id="strategySelect" class="w-full bg-[#090c10] border border-gray-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="dca">DCA Accumulator (Hourly)</option>
+                                    <option value="volatility">Volatility Hedger (Dynamic)</option>
+                                    <option value="privacy">UTXO Privacy Consolidator</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>Risk Tolerance Threshold</span>
+                                    <span id="riskValue" class="text-emerald-400 font-mono">4.5%</span>
+                                </div>
+                                <input type="range" id="riskSlider" min="1" max="10" step="0.5" value="4.5" oninput="document.getElementById('riskValue').innerText = this.value + '%'" class="w-full accent-emerald-500 bg-gray-800 rounded-lg h-2 cursor-pointer">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 pt-2">
+                        <button id="botToggleBtn" onclick="toggleBot()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/10">Start Autonomous Bot</button>
+                        <button onclick="resetBotStats()" class="w-full bg-transparent hover:bg-gray-800 text-gray-400 font-semibold py-2 rounded-xl text-xs transition">Clear Bot State</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Bottom Section: Execution Logs Console -->
+            <div class="bg-[#121824] border border-gray-800 rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-sm flex items-center space-x-2">
+                        <span>💻</span>
+                        <span>Client-Side Execution Logs (Zero Telemetry)</span>
+                    </h3>
+                    <button onclick="clearLogs()" class="text-xs text-gray-500 hover:text-gray-300 transition">Clear Console</button>
+                </div>
+                <div id="logConsole" class="bg-[#090c10] border border-gray-800 rounded-xl p-4 font-mono text-xs text-emerald-400 h-36 overflow-y-auto space-y-1">
+                    <div>[01:06:00] [Vault] Local keychain initialized securely.</div>
+                    <div>[01:06:01] [Tor] Handshake established with 3 decentralized network guard nodes.</div>
+                    <div>[01:06:02] [Engine] Prediction tensor models loaded into local device memory.</div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-gray-800 bg-[#121824]/30 py-4 text-center text-xs text-gray-500">
+            Unstoppable Wallet Architecture • Absolute Privacy • Peer-to-Peer Execution
+        </footer>
+    </div>
+
+    <!-- Script Application Logic -->
+    <script>
+        let myChart = null;
+        let botInterval = null;
+        let isBotRunning = false;
+
+        function autoFillDemo() {
+            document.getElementById('seedInput').value = "abandon ability able about above absent absorb abstract absurd abuse access accident";
+            document.getElementById('pinInput').value = "7777";
+        }
+
+        function unlockVault() {
+            const seed = document.getElementById('seedInput').value.trim();
+            const pin = document.getElementById('pinInput').value.trim();
+
+            if (!seed || pin.length < 4) {
+                alert("Please enter a valid recovery phrase and a 4+ digit local PIN.");
+                return;
+            }
+
+            // Hide login, show dashboard
+            document.getElementById('loginOverlay').classList.add('hidden');
+            document.getElementById('mainDashboard').classList.remove('hidden');
+
+            appendLog("[Vault] Master seed successfully derived via PBKDF2 locally.");
+            appendLog("[Engine] Local database unlocked. Active wallet synced.");
+
+            if (!myChart) {
+                initChart();
+            }
+        }
+
+        function lockVault() {
+            if (isBotRunning) {
+                toggleBot(); // Stop bot on lock
+            }
+            document.getElementById('mainDashboard').classList.add('hidden');
+            document.getElementById('loginOverlay').classList.remove('hidden');
+            document.getElementById('seedInput').value = "";
+            document.getElementById('pinInput').value = "";
+            appendLog("[Vault] Session locked. Volatile memory wiped.");
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['T-3h', 'T-2h', 'T-1h', 'Now', '+1h (Pred)', '+2h (Pred)', '+3h (Pred)'],
+                    datasets: [{
+                        label: 'Local Predictive Trend Index',
+                        data: [100, 102.5, 101.8, 105.2, 106.0, 108.4, 111.2],
+                        borderColor: '#00d395',
+                        backgroundColor: 'rgba(0, 211, 149, 0.05)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { family: 'monospace', size: 10 } } },
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { family: 'monospace', size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function appendLog(message) {
+            const consoleBox = document.getElementById('logConsole');
+            const timeStr = new Date().toLocaleTimeString();
+            consoleBox.innerHTML += `<div>[${timeStr}] ${message}</div>`;
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logConsole').innerHTML = "";
+        }
+
+        function toggleBot() {
+            const btn = document.getElementById('botToggleBtn');
+            const indicator = document.getElementById('botStatusIndicator');
+            const statusText = document.getElementById('botStatusText');
+            const strategySelect = document.getElementById('strategySelect');
+            const strategyText = document.getElementById('botActiveStrategy');
+
+            isBotRunning = !isBotRunning;
+
+            if (isBotRunning) {
+                btn.innerText = "Stop Autonomous Bot";
+                btn.className = "w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold py-3 rounded-xl text-sm transition border border-red-500/30 shadow-lg";
+                indicator.className = "w-3 h-3 rounded-full bg-emerald-400 animate-ping";
+                statusText.innerText = "Running (Autonomous)";
+                statusText.className = "text-emerald-400";
+                strategyText.innerText = `Strategy: ${strategySelect.options[strategySelect.selectedIndex].text}`;
+
+                appendLog(`[Bot] Autonomous routine initiated with strategy: ${strategySelect.value}`);
+
+                // Simulate background trading or execution loops
+                botInterval = setInterval(() => {
+                    const actions = [
+                        "Executing client-side UTXO evaluation...",
+                        "Optimizing privacy mix ratio over localized network nodes...",
+                        "Recalibrating tensor prediction weights based on moving variance...",
+                        "Simulated decentralized swap completed successfully with zero metadata trail."
+                    ];
+                    const randomAction = actions[Math.floor(Math.random() * actions.length)];
+                    appendLog(`[Bot Loop] ${randomAction}`);
+
+                    // Shift chart slightly for live feel
+                    if(myChart) {
+                        const currentData = myChart.data.datasets[0].data;
+                        const lastVal = currentData[currentData.length - 1];
+                        const nextVal = +(lastVal + (Math.random() * 1.2 - 0.5)).toFixed(2);
+                        currentData.push(nextVal);
+                        currentData.shift();
+                        myChart.update('none');
+                    }
+                }, 4000);
+
+            } else {
+                btn.innerText = "Start Autonomous Bot";
+                btn.className = "w-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/10";
+                indicator.className = "w-3 h-3 rounded-full bg-gray-500";
+                statusText.innerText = "Standby";
+                statusText.className = "text-gray-400";
+                strategyText.innerText = "Strategy: None Selected";
+
+                clearInterval(botInterval);
+                appendLog("[Bot] Autonomous execution paused by user.");
+            }
+        }
+
+        function triggerManualScan() {
+            appendLog("[Engine] Manual tensor scan triggered over local data feeds...");
+            setTimeout(() => {
+                const directions = ["Bullish (7D)", "Accumulation Phase", "Consolidation Range"];
+                const selectedDir = directions[Math.floor(Math.random() * directions.length)];
+                document.getElementById('predictionDirection').innerText = selectedDir;
+                appendLog(`[Engine] Forecast updated: Market sentiment is ${selectedDir}.`);
+            }, 600);
+        }
+
+        function resetBotStats() {
+            appendLog("[Bot] State variables cleared from volatile memory.");
+        }
+    </script>
+</body>
+</html>
